@@ -10,6 +10,7 @@ import { PRESET_SEGMENTS, PRESET_THEMES } from './data/presets';
 import { KioskView } from './pages/KioskView';
 import { AdminPage } from './pages/AdminPage';
 import { HistoryPage } from './pages/HistoryPage';
+import { getHashQueryParam } from './utils/common';
 
 const LOCAL_STORAGE_KEY_REWARDS = 'spin_and_win_claimed_rewards_v3';
 const LOCAL_STORAGE_KEY_SEGMENTS = 'spin_and_win_segments_v3';
@@ -17,10 +18,20 @@ const LOCAL_STORAGE_KEY_CONFIG = 'spin_and_win_config_v3';
 const LOCAL_STORAGE_KEY_DISPLAY_MODE = 'spin_and_win_display_mode_v3';
 const LOCAL_STORAGE_KEY_TOTAL_SPINS = 'spin_and_win_total_spins_v3';
 
+const requestedThemeId = getHashQueryParam('theme');
+const urlThemeId = requestedThemeId && PRESET_THEMES[requestedThemeId] ? requestedThemeId : null;
+
 export default function App() {
-  // Theme state
-  const [currentThemeId, setCurrentThemeId] = useState<string>('btn-housing-expo');
+  // Theme state (URL ?theme= param wins over the default)
+  const [currentThemeId, setCurrentThemeId] = useState<string>(urlThemeId || 'btn-housing-expo');
   const activeTheme: WheelTheme = PRESET_THEMES[currentThemeId] || PRESET_THEMES['btn-housing-expo'];
+
+  // Strip ?theme= from the URL once applied, so a refresh doesn't re-trigger it
+  useEffect(() => {
+    if (urlThemeId) {
+      window.history.replaceState(null, '', `${window.location.pathname}#/`);
+    }
+  }, []);
 
   // Display mode (Default: 'signage' for digital signage)
   const [displayMode, setDisplayMode] = useState<DisplayMode>(() => {
@@ -37,6 +48,9 @@ export default function App() {
 
   // Segments state
   const [segments, setSegments] = useState<WheelSegment[]>(() => {
+    if (urlThemeId) {
+      return PRESET_SEGMENTS[urlThemeId] || [];
+    }
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY_SEGMENTS);
       if (saved) {
@@ -59,11 +73,14 @@ export default function App() {
       easing: 'suspense-slowdown',
       soundEnabled: true,
       hapticEnabled: true,
-      themeId: 'btn-housing-expo',
+      themeId: (urlThemeId as SpinConfig['themeId']) || 'btn-housing-expo',
       bulbsEffect: 'chase',
       testRiggedSegmentId: null,
       dailySpinLimit: 10,
     };
+    if (urlThemeId) {
+      return defaultConfig;
+    }
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY_CONFIG);
       if (saved) {
