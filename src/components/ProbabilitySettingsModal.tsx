@@ -101,7 +101,9 @@ export const ProbabilitySettingsModal: React.FC<ProbabilitySettingsModalProps> =
       prizeValue: '$25 Value',
       voucherCodeTemplate: 'VOUCHER-NEW',
       terms: 'Valid during promotional campaign.',
-      stock: 50,
+      initialQuota: 50,
+      wonCount: 0,
+      unlimitedQuota: false,
     };
     onUpdateSegments([...segments, newSegment]);
   };

@@ -8,7 +8,6 @@ interface SpinningWheelProps {
   config: SpinConfig;
   theme: WheelTheme;
   isSpinning: boolean;
-  spinsLeft: number;
   onSpinStart: () => void;
   onSpinEnd: (winningSegment: WheelSegment) => void;
 }
@@ -18,14 +17,13 @@ export const SpinningWheel: React.FC<SpinningWheelProps> = ({
   config,
   theme,
   isSpinning,
-  spinsLeft,
   onSpinStart,
   onSpinEnd,
 }) => {
   const [currentRotation, setCurrentRotation] = useState<number>(0);
   const [tickerAngle, setTickerAngle] = useState<number>(0);
   const [winningSliceIndex, setWinningSliceIndex] = useState<number | null>(null);
-  const [bulbFrame, setBulbFrame] = useState<number>(0);
+  const [oddLightPhase, setOddLightPhase] = useState<number>(0);
 
   const animRef = useRef<number | null>(null);
   const startTimeRef = useRef<number | null>(null);
@@ -38,49 +36,49 @@ export const SpinningWheel: React.FC<SpinningWheelProps> = ({
   const sliceAngle = 360 / numSegments;
   const numBulbs = 24;
 
-  // LED bulb chasing animation
+  // Odd lights animation loop (chasing wave & pulse through odd bulbs)
   useEffect(() => {
     const interval = setInterval(() => {
-      setBulbFrame((prev) => (prev + 1) % numBulbs);
-    }, isSpinning ? 60 : 250);
+      setOddLightPhase((prev) => (prev + 1) % 12);
+    }, isSpinning ? 70 : 200);
     return () => clearInterval(interval);
-  }, [isSpinning, numBulbs]);
+  }, [isSpinning]);
 
-  // Generate bulbs around rim
+  // Generate 24 bulbs around the silver bezel rim
   const bulbs = useMemo(() => {
     const arr = [];
-    const radius = 232;
+    const radius = 230;
     for (let i = 0; i < numBulbs; i++) {
-      const angle = (i * 360) / numBulbs;
+      // 0 deg is at 3 o'clock; offset so top starts cleanly
+      const angle = (i * 360) / numBulbs - 90;
       const rad = (angle * Math.PI) / 180;
       const cx = 250 + radius * Math.cos(rad);
       const cy = 250 + radius * Math.sin(rad);
-      arr.push({ id: i, cx, cy, angle });
+      const isOdd = i % 2 === 1;
+      const oddIndex = Math.floor(i / 2);
+      arr.push({ id: i, cx, cy, angle, isOdd, oddIndex });
     }
     return arr;
   }, [numBulbs]);
 
   // Easing helper functions
   const getProgress = (t: number, easing: SpinConfig['easing']) => {
-    // t is 0 to 1
     if (easing === 'cubic-ease-out') {
       return 1 - Math.pow(1 - t, 3);
     }
     if (easing === 'elastic-bounce') {
-      // Custom overshoot and settle
       const c4 = (2 * Math.PI) / 3;
       return t === 0 ? 0 : t === 1 ? 1 : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
     }
     if (easing === 'ultra-fast') {
       return 1 - Math.pow(1 - t, 4);
     }
-    // 'suspense-slowdown': high speed early, dramatic slow crawl at the end
     return 1 - Math.pow(1 - t, 5);
   };
 
   // Perform Spin
   const startSpin = () => {
-    if (isSpinning || (spinsLeft <= 0 && !config.testRiggedSegmentId)) return;
+    if (isSpinning) return;
 
     if (config.soundEnabled) {
       playButtonPressSound();
@@ -89,23 +87,40 @@ export const SpinningWheel: React.FC<SpinningWheelProps> = ({
     setWinningSliceIndex(null);
     onSpinStart();
 
-    // 1. Pick target segment based on weights (or test rigging)
+    // 1. Pick target segment based on weights, test rigged ID, and quotas
     let selectedSegment: WheelSegment;
 
     if (config.testRiggedSegmentId) {
       const found = segments.find((s) => s.id === config.testRiggedSegmentId);
       selectedSegment = found || segments[0];
     } else {
-      const totalWeight = segments.reduce((sum, seg) => sum + Math.max(0.001, seg.weight), 0);
-      let rand = Math.random() * totalWeight;
-      selectedSegment = segments[0];
+      // Calculate active weights respecting remaining quotas
+      const segmentsWithEffectiveWeights = segments.map((seg) => {
+        const hasQuotaLimit = !seg.unlimitedQuota && seg.initialQuota !== undefined;
+        const isOutOfStock = hasQuotaLimit && (seg.initialQuota! - (seg.wonCount || 0) <= 0);
+        return {
+          segment: seg,
+          effectiveWeight: isOutOfStock ? 0 : Math.max(0.001, seg.weight),
+        };
+      });
 
-      for (const seg of segments) {
-        if (rand < seg.weight) {
-          selectedSegment = seg;
-          break;
+      const totalWeight = segmentsWithEffectiveWeights.reduce((sum, item) => sum + item.effectiveWeight, 0);
+
+      if (totalWeight <= 0) {
+        const lossSegment = segments.find((s) => s.isLoss) || segments[0];
+        selectedSegment = lossSegment;
+      } else {
+        let rand = Math.random() * totalWeight;
+        selectedSegment = segments[0];
+
+        for (const item of segmentsWithEffectiveWeights) {
+          if (item.effectiveWeight <= 0) continue;
+          if (rand < item.effectiveWeight) {
+            selectedSegment = item.segment;
+            break;
+          }
+          rand -= item.effectiveWeight;
         }
-        rand -= seg.weight;
       }
     }
 
@@ -113,18 +128,12 @@ export const SpinningWheel: React.FC<SpinningWheelProps> = ({
     targetSegmentRef.current = selectedSegment;
 
     // 2. Compute target rotation
-    // In SVG, segment 0 starts at 0 deg (top = 0 deg).
-    // Mid angle of segment i: (i + 0.5) * sliceAngle
-    // When wheel is rotated clockwise by R degrees, the top pointer (0 deg) hits the slice at:
-    // pointerSlice = Math.floor(((360 - (R % 360)) % 360) / sliceAngle)
-    // To make top pointer hit selectedIndex:
-    // We want ((360 - (R % 360)) % 360) = (selectedIndex + 0.5) * sliceAngle
-    // => (R % 360) = (360 - (selectedIndex + 0.5) * sliceAngle)
+    // Pointer is at the top (270 deg / -90 deg from center)
     const midAngle = (selectedIndex + 0.5) * sliceAngle;
     const targetRemainder = (360 - midAngle + 360) % 360;
 
-    // Add safe random jitter inside slice (+/- 25% of slice width so it never hits the line)
-    const jitter = (Math.random() - 0.5) * (sliceAngle * 0.5);
+    // Subtle random jitter inside slice (±25% width)
+    const jitter = (Math.random() - 0.5) * (sliceAngle * 0.4);
 
     const fullSpins = config.minRotations * 360;
     const currentBase = Math.floor(currentRotation / 360) * 360;
@@ -147,22 +156,18 @@ export const SpinningWheel: React.FC<SpinningWheelProps> = ({
       const newAngle = startAngleRef.current + (targetAngleRef.current - startAngleRef.current) * eased;
       setCurrentRotation(newAngle);
 
-      // Ticker pin deflection & tick sound calculation
-      // Number of slices passed:
+      // Ticker pin deflection & tick sound
       const totalPegAngle = newAngle;
       const currentPegIndex = Math.floor(totalPegAngle / sliceAngle);
 
       if (currentPegIndex !== lastPegCrossedRef.current) {
         lastPegCrossedRef.current = currentPegIndex;
-
-        // Animate pointer kick
-        setTickerAngle(-22);
+        setTickerAngle(-20);
         setTimeout(() => setTickerAngle(0), 40);
 
         if (config.soundEnabled) {
-          // Dynamic pitch based on spin speed
           const speedFactor = 1 - progress;
-          playTickSound(500 + speedFactor * 400, 0.12 + speedFactor * 0.1);
+          playTickSound(520 + speedFactor * 400, 0.12 + speedFactor * 0.1);
         }
       }
 
@@ -190,215 +195,304 @@ export const SpinningWheel: React.FC<SpinningWheelProps> = ({
   }, []);
 
   return (
-    <div className="flex flex-col items-center justify-center relative w-full max-w-[480px] mx-auto select-none">
-      {/* Glow aura behind wheel */}
+    <div className="flex flex-col items-center justify-center relative w-full max-w-[560px] mx-auto select-none">
+      {/* Ambient background glow */}
       <div
-        className={`absolute -inset-4 rounded-full blur-3xl opacity-30 pointer-events-none transition-all duration-700 ${
+        className={`absolute -inset-6 rounded-full blur-3xl opacity-30 pointer-events-none transition-all duration-700 ${
           isSpinning
-            ? 'bg-gradient-to-r from-blue-500 via-amber-400 to-red-500 scale-105 opacity-60 animate-pulse'
-            : 'bg-gradient-to-tr from-blue-400 to-amber-200 opacity-20'
+            ? 'bg-gradient-to-r from-blue-600 via-amber-400 to-red-600 scale-105 opacity-55 animate-pulse'
+            : 'bg-gradient-to-tr from-blue-600/30 via-slate-800/20 to-amber-500/30 opacity-30'
         }`}
       />
 
-      {/* Wheel Container */}
-      <div className="relative w-full aspect-square max-w-[420px] sm:max-w-[440px] p-2 flex items-center justify-center">
-        {/* Top Ticker Pointer */}
+      {/* Wheel Stage Container - CLICKABLE TO SPIN */}
+      <div
+        id="interactive-wheel-stage"
+        onClick={startSpin}
+        title={isSpinning ? 'Sedang Memutar...' : 'Klik Roda Untuk Memutar!'}
+        className={`relative w-[340px] h-[340px] xs:w-[390px] xs:h-[390px] sm:w-[460px] sm:h-[460px] md:w-[510px] md:h-[510px] flex items-center justify-center cursor-pointer transition-transform duration-300 ${
+          isSpinning ? 'cursor-not-allowed scale-[0.995]' : 'hover:scale-[1.015] active:scale-[0.985]'
+        }`}
+      >
+        {/* Top Pointer Needle (Fixed at top 12 o'clock, styled like Screenshot_1.png) */}
         <div
-          className="absolute -top-1 sm:-top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none drop-shadow-xl transition-transform duration-75 origin-top"
-          style={{
-            transform: `translateX(-50%) rotate(${tickerAngle}deg)`,
-          }}
+          className="absolute -top-4 z-40 flex flex-col items-center pointer-events-none drop-shadow-2xl transition-transform duration-75 origin-top"
+          style={{ transform: `rotate(${tickerAngle}deg)` }}
         >
-          {/* Stylized 3D Metallic Triangle Pointer */}
-          <svg width="44" height="48" viewBox="0 0 44 48" fill="none">
-            <defs>
-              <linearGradient id="pointerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#EF4444" />
-                <stop offset="50%" stopColor="#DC2626" />
-                <stop offset="100%" stopColor="#991B1B" />
-              </linearGradient>
-              <linearGradient id="pointerHighlight" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.8" />
-                <stop offset="100%" stopColor="#DC2626" stopOpacity="0" />
-              </linearGradient>
-              <filter id="pointerShadow" x="-20%" y="-20%" width="140%" height="140%">
-                <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#000000" floodOpacity="0.4" />
-              </filter>
-            </defs>
-            <path
-              d="M 22 46 L 5 8 C 3 4, 6 1, 10 1 L 34 1 C 38 1, 41 4, 39 8 Z"
-              fill="url(#pointerGrad)"
-              filter="url(#pointerShadow)"
-              stroke="#FFFFFF"
-              strokeWidth="2"
-            />
-            {/* Top Gloss Highlight */}
-            <path
-              d="M 12 3 L 32 3 C 34 3, 35 4, 34 6 L 22 34 L 10 6 C 9 4, 10 3, 12 3 Z"
-              fill="url(#pointerHighlight)"
-              opacity="0.6"
-            />
-            {/* Center golden pivot jewel on pointer */}
-            <circle cx="22" cy="12" r="4.5" fill="#FBBF24" stroke="#78350F" strokeWidth="1" />
-            <circle cx="21" cy="11" r="1.5" fill="#FFFFFF" />
-          </svg>
+          <div className="w-12 h-16 relative flex justify-center items-start">
+            <svg viewBox="0 0 44 56" className="w-full h-full drop-shadow-xl" fill="none">
+              <defs>
+                <linearGradient id="needleRedGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#EF4444" />
+                  <stop offset="45%" stopColor="#DC2626" />
+                  <stop offset="100%" stopColor="#991B1B" />
+                </linearGradient>
+                <radialGradient id="needlePinGold" cx="35%" cy="35%" r="65%">
+                  <stop offset="0%" stopColor="#FFFBEB" />
+                  <stop offset="40%" stopColor="#F59E0B" />
+                  <stop offset="100%" stopColor="#B45309" />
+                </radialGradient>
+                <filter id="needleShadow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feDropShadow dx="0" dy="3" stdDeviation="2.5" floodColor="#000000" floodOpacity="0.6" />
+                </filter>
+              </defs>
+
+              {/* Red triangular pointer body with white outline */}
+              <polygon
+                points="22,54 4,14 40,14"
+                fill="url(#needleRedGrad)"
+                stroke="#FFFFFF"
+                strokeWidth="3.5"
+                strokeLinejoin="round"
+                filter="url(#needleShadow)"
+              />
+
+              {/* Red curved top cap */}
+              <path
+                d="M 4 14 C 4 6 40 6 40 14 Z"
+                fill="url(#needleRedGrad)"
+                stroke="#FFFFFF"
+                strokeWidth="3.5"
+                strokeLinejoin="round"
+              />
+
+              {/* Top golden jewel pin */}
+              <circle
+                cx="22"
+                cy="14"
+                r="7"
+                fill="url(#needlePinGold)"
+                stroke="#FFFFFF"
+                strokeWidth="2"
+              />
+              <circle cx="22" cy="14" r="3.5" fill="#EF4444" />
+            </svg>
+          </div>
         </div>
 
-        {/* Main SVG Wheel Canvas */}
+        {/* SVG Wheel Graphic */}
         <svg
           viewBox="0 0 500 500"
-          className="w-full h-full drop-shadow-2xl overflow-visible"
+          className="w-full h-full transform transition-all duration-300"
         >
           <defs>
-            {/* Outer Bezel Gradients */}
-            <linearGradient id="rimGold" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#FFFFFF" />
-              <stop offset="30%" stopColor="#E2E8F0" />
-              <stop offset="70%" stopColor="#CBD5E1" />
+            {/* Outer silver bevel gradient */}
+            <linearGradient id="silverBezelGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#F1F5F9" />
+              <stop offset="25%" stopColor="#E2E8F0" />
+              <stop offset="50%" stopColor="#CBD5E1" />
+              <stop offset="75%" stopColor="#E2E8F0" />
               <stop offset="100%" stopColor="#94A3B8" />
             </linearGradient>
 
-            <linearGradient id="rimOuter" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#F8FAFC" />
-              <stop offset="50%" stopColor="#E2E8F0" />
-              <stop offset="100%" stopColor="#CBD5E1" />
+            {/* Silver rim 3D inner stroke */}
+            <linearGradient id="silverRimDark" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#64748B" />
+              <stop offset="100%" stopColor="#334155" />
             </linearGradient>
 
-            <radialGradient id="centerJewel" cx="35%" cy="35%" r="70%">
-              <stop offset="0%" stopColor="#FFFFFF" />
-              <stop offset="35%" stopColor="#3B82F6" />
-              <stop offset="85%" stopColor="#1D4ED8" />
-              <stop offset="100%" stopColor="#1E3A8A" />
+            {/* Blue spherical center hub gradient */}
+            <radialGradient id="centerBlueSphere" cx="38%" cy="36%" r="62%">
+              <stop offset="0%" stopColor="#93C5FD" />
+              <stop offset="25%" stopColor="#3B82F6" />
+              <stop offset="65%" stopColor="#1D4ED8" />
+              <stop offset="100%" stopColor="#172554" />
             </radialGradient>
 
-            <radialGradient id="goldJewel" cx="35%" cy="35%" r="70%">
-              <stop offset="0%" stopColor="#FFFBEB" />
-              <stop offset="40%" stopColor="#FBBF24" />
-              <stop offset="85%" stopColor="#D97706" />
-              <stop offset="100%" stopColor="#78350F" />
-            </radialGradient>
+            {/* Gold star gradient */}
+            <linearGradient id="goldStarGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#FEF08A" />
+              <stop offset="50%" stopColor="#FACC15" />
+              <stop offset="100%" stopColor="#EAB308" />
+            </linearGradient>
 
-            <filter id="glowFilter" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="4" result="blur" />
-              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            {/* Golden bulb glow filter */}
+            <filter id="goldenBulbGlow" x="-60%" y="-60%" width="220%" height="220%">
+              <feGaussianBlur stdDeviation="3.5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+
+            {/* Slice Drop Shadow */}
+            <filter id="sliceDropShadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#000000" floodOpacity="0.4" />
             </filter>
           </defs>
 
-          {/* Outer Heavy Bezel / Ring */}
+          {/* 1. Outermost Dark Bezel Trim */}
           <circle
             cx="250"
             cy="250"
-            r="246"
-            fill="url(#rimOuter)"
-            stroke="#94A3B8"
+            r="248"
+            fill="#1E293B"
+            stroke="#0F172A"
             strokeWidth="3"
           />
+
+          {/* 2. Broad Silver/White Metallic Bezel (Screenshot_1.png style) */}
           <circle
             cx="250"
             cy="250"
-            r="228"
-            fill="#0F172A"
-            stroke="#CBD5E1"
-            strokeWidth="2"
+            r="244"
+            fill="url(#silverBezelGrad)"
+            stroke="#475569"
+            strokeWidth="2.5"
           />
 
-          {/* Animated LED Bulbs on Bezel */}
-          {bulbs.map((bulb, idx) => {
-            const isChasing = (bulbFrame + idx) % 4 === 0;
-            const isAltChasing = (bulbFrame + idx + 2) % 4 === 0;
-            const isLit = config.bulbsEffect === 'steady' || (config.bulbsEffect === 'chase' ? isChasing : isAltChasing);
-            const bulbColor = isLit ? '#FBBF24' : '#475569';
-            const glowColor = isLit ? '#F59E0B' : 'transparent';
+          {/* Inner silver groove */}
+          <circle
+            cx="250"
+            cy="250"
+            r="218"
+            fill="none"
+            stroke="#64748B"
+            strokeWidth="2"
+            opacity="0.8"
+          />
 
-            return (
-              <g key={bulb.id}>
-                {/* Glow ring */}
-                {isLit && (
-                  <circle
-                    cx={bulb.cx}
-                    cy={bulb.cy}
-                    r="8"
-                    fill={glowColor}
-                    opacity="0.6"
-                    filter="url(#glowFilter)"
-                  />
-                )}
-                {/* Bulb body */}
-                <circle
-                  cx={bulb.cx}
-                  cy={bulb.cy}
-                  r="5"
-                  fill={bulbColor}
-                  stroke="#FFFFFF"
-                  strokeWidth="1.2"
-                />
-                {isLit && (
-                  <circle
-                    cx={bulb.cx - 1.2}
-                    cy={bulb.cy - 1.2}
-                    r="1.5"
-                    fill="#FFFFFF"
-                  />
-                )}
-              </g>
-            );
-          })}
+          {/* 3. Outer Light Bulbs Array (Odd Lights Animated with Golden Glow Rings) */}
+          <g id="outer-bezel-lights">
+            {bulbs.map((b) => {
+              if (b.isOdd) {
+                // Odd bulb: Signature amber-gold glowing orb with outer halo ring
+                // Animated pulse / wave moving across odd bulbs
+                const waveIntensity = (b.oddIndex + oddLightPhase) % 12;
+                const isPeak = waveIntensity === 0 || waveIntensity === 1;
+                const haloRadius = isPeak ? 9.5 : 8;
+                const haloOpacity = isPeak ? 0.95 : 0.65;
+                const coreFill = isPeak ? '#FEF08A' : '#F59E0B';
 
-          {/* INNER ROTATING DISC */}
+                return (
+                  <g key={b.id} className="transition-all duration-150">
+                    {/* Outer Golden Halo Ring */}
+                    <circle
+                      cx={b.cx}
+                      cy={b.cy}
+                      r={haloRadius}
+                      fill="none"
+                      stroke="#F59E0B"
+                      strokeWidth={isPeak ? 2.5 : 1.8}
+                      opacity={haloOpacity}
+                      filter="url(#goldenBulbGlow)"
+                    />
+
+                    {/* Amber Core Jewel */}
+                    <circle
+                      cx={b.cx}
+                      cy={b.cy}
+                      r="5.5"
+                      fill={coreFill}
+                      stroke="#FFFFFF"
+                      strokeWidth="1.2"
+                      filter="url(#goldenBulbGlow)"
+                    />
+
+                    {/* Specular White Highlight */}
+                    <circle
+                      cx={b.cx - 1.2}
+                      cy={b.cy - 1.2}
+                      r="2"
+                      fill="#FFFFFF"
+                      opacity="0.9"
+                    />
+                  </g>
+                );
+              } else {
+                // Even bulb: Metallic dark slate socket (Screenshot_1.png style)
+                return (
+                  <g key={b.id}>
+                    <circle
+                      cx={b.cx}
+                      cy={b.cy}
+                      r="5.5"
+                      fill="#334155"
+                      stroke="#1E293B"
+                      strokeWidth="1.5"
+                    />
+                    <circle
+                      cx={b.cx}
+                      cy={b.cy}
+                      r="3.5"
+                      fill="#475569"
+                    />
+                    <circle
+                      cx={b.cx - 1}
+                      cy={b.cy - 1}
+                      r="1.2"
+                      fill="#94A3B8"
+                      opacity="0.7"
+                    />
+                  </g>
+                );
+              }
+            })}
+          </g>
+
+          {/* 4. ROTATING DISC SLICES */}
           <g
-            id="wheel-rotor"
-            transform={`rotate(${currentRotation}, 250, 250)`}
-            className="transition-none"
+            id="wheel-slices-group"
+            style={{
+              transform: `rotate(${currentRotation}deg)`,
+              transformOrigin: '250px 250px',
+            }}
           >
-            {/* Outer Wheel Rim */}
+            {/* White boundary ring behind slices */}
             <circle
               cx="250"
               cy="250"
-              r="216"
+              r="215"
               fill="#FFFFFF"
-              stroke="#E2E8F0"
-              strokeWidth="4"
             />
 
-            {/* SECTORS / SLICES */}
             {segments.map((segment, index) => {
-              const startAngle = index * sliceAngle - 90; // Align 0 index to top (12 o'clock)
-              const endAngle = (index + 1) * sliceAngle - 90;
+              const startAngle = index * sliceAngle - 90;
+              const endAngle = startAngle + sliceAngle;
               const midAngle = startAngle + sliceAngle / 2;
 
-              const r = 214;
+              const isWinning = winningSliceIndex === index;
+              const hasQuotaLimit = !segment.unlimitedQuota && segment.initialQuota !== undefined;
+              const isOutOfStock = hasQuotaLimit && (segment.initialQuota! - (segment.wonCount || 0) <= 0);
+
+              const radius = 212;
               const startRad = (startAngle * Math.PI) / 180;
               const endRad = (endAngle * Math.PI) / 180;
 
-              const x1 = 250 + r * Math.cos(startRad);
-              const y1 = 250 + r * Math.sin(startRad);
-              const x2 = 250 + r * Math.cos(endRad);
-              const y2 = 250 + r * Math.sin(endRad);
+              const x1 = 250 + radius * Math.cos(startRad);
+              const y1 = 250 + radius * Math.sin(startRad);
+              const x2 = 250 + radius * Math.cos(endRad);
+              const y2 = 250 + radius * Math.sin(endRad);
 
               const largeArcFlag = sliceAngle > 180 ? 1 : 0;
-              const pathData = `M 250 250 L ${x1} ${y1} A ${r} ${r} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
+              const pathData = `M 250 250 L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
 
-              const isWinningSlice = winningSliceIndex === index;
+              // Alternate red & blue if custom not specified
+              const sliceColor = isOutOfStock
+                ? '#334155'
+                : segment.color || (index % 2 === 0 ? '#D92D20' : '#1D4ED8');
 
               return (
-                <g key={segment.id} className="select-none">
-                  {/* Slice Wedge */}
+                <g key={segment.id} id={`slice-${segment.id}`}>
+                  {/* Segment Slice Path */}
                   <path
                     d={pathData}
-                    fill={segment.color}
+                    fill={sliceColor}
                     stroke="#FFFFFF"
-                    strokeWidth="2.5"
-                    className={isWinningSlice ? 'filter brightness-125' : ''}
+                    strokeWidth="3"
+                    opacity={isOutOfStock ? 0.65 : isWinning ? 1 : 0.98}
+                    filter={isWinning ? 'url(#sliceDropShadow)' : undefined}
+                    className="transition-all duration-200"
                   />
 
-                  {/* Inner divider highlight line */}
+                  {/* Spoke Divider Line */}
                   <line
                     x1="250"
                     y1="250"
                     x2={x1}
                     y2={y1}
                     stroke="#FFFFFF"
-                    strokeWidth="2.5"
+                    strokeWidth="3.5"
                     strokeLinecap="round"
                   />
 
@@ -407,155 +501,133 @@ export const SpinningWheel: React.FC<SpinningWheelProps> = ({
                     transform={`rotate(${midAngle + 90}, 250, 250)`}
                     className="pointer-events-none"
                   >
-                    {/* Position group towards outer edge */}
-                    <g transform="translate(250, 75)">
+                    <g transform="translate(250, 80)">
                       {/* Icon */}
-                      <g transform="translate(0, 5) scale(1.15)">
+                      <g transform="translate(0, 10) scale(1.2)">
                         <foreignObject x="-14" y="-14" width="28" height="28">
                           <div className="w-full h-full flex items-center justify-center text-white drop-shadow-md">
-                            <SegmentIcon name={segment.iconName} className="w-6 h-6 text-white" />
+                            <SegmentIcon name={segment.iconName} className="w-6 h-6 text-white stroke-[2.2]" />
                           </div>
                         </foreignObject>
                       </g>
 
-                      {/* Label Text - Optimized for readability without truncation */}
+                      {/* Label Text */}
                       <text
                         x="0"
-                        y="34"
-                        fill={segment.textColor || '#FFFFFF'}
+                        y="40"
+                        fill={isOutOfStock ? '#94A3B8' : segment.textColor || '#FFFFFF'}
                         textAnchor="middle"
-                        className="font-black tracking-tight drop-shadow-md"
+                        className="font-black tracking-tight"
                         style={{
-                          fontSize: numSegments > 8 ? '11px' : numSegments > 6 ? '12.5px' : '14px',
-                          textShadow: '0 2px 4px rgba(0,0,0,0.5)',
+                          fontSize: numSegments > 8 ? '11px' : numSegments > 6 ? '12.5px' : '14.5px',
+                          textShadow: '0 2px 4px rgba(0,0,0,0.7)',
+                          fontWeight: 900,
                         }}
                       >
-                        {segment.label.length > 18
-                          ? segment.label.slice(0, 16) + '…'
+                        {isOutOfStock
+                          ? 'HABIS'
+                          : segment.label.length > 19
+                          ? segment.label.slice(0, 18) + '…'
                           : segment.label}
                       </text>
 
-                      {/* Subtext or Value Pill */}
-                      {segment.prizeValue && (
+                      {/* Subtext or Value */}
+                      {!isOutOfStock && (segment.prizeValue || segment.subtext) && (
                         <text
                           x="0"
-                          y="48"
+                          y="55"
                           fill="#FEF08A"
                           textAnchor="middle"
-                          className="font-bold text-[9px] tracking-normal"
-                          style={{ textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}
+                          className="font-bold text-[9.5px] tracking-tight"
+                          style={{
+                            textShadow: '0 1px 3px rgba(0,0,0,0.85)',
+                            fontWeight: 700,
+                          }}
                         >
-                          {segment.prizeValue}
+                          {segment.prizeValue || segment.subtext}
+                        </text>
+                      )}
+
+                      {isOutOfStock && (
+                        <text
+                          x="0"
+                          y="55"
+                          fill="#F87171"
+                          textAnchor="middle"
+                          className="font-bold text-[9px] tracking-normal uppercase"
+                        >
+                          Kuota Habis
                         </text>
                       )}
                     </g>
                   </g>
 
-                  {/* Rim Pegs */}
+                  {/* Outer Spoke Rim Pin/Peg (White dot with border) */}
                   <circle
                     cx={x1}
                     cy={y1}
-                    r="4"
+                    r="4.5"
                     fill="#FFFFFF"
-                    stroke="#475569"
+                    stroke="#1E293B"
                     strokeWidth="1.5"
                   />
                 </g>
               );
             })}
 
-            {/* Inner Ring Separator */}
+            {/* Inner Center Cutout Circle */}
             <circle
               cx="250"
               cy="250"
               r="48"
               fill="none"
               stroke="#FFFFFF"
-              strokeWidth="4"
-              opacity="0.9"
+              strokeWidth="4.5"
             />
           </g>
 
-          {/* STATIC CENTER HUB & JEWEL */}
+          {/* 5. STATIC CENTER HUB (Screenshot_1.png: Silver Bezel + Blue Sphere + Golden Star ⭐) */}
+          {/* Outer Silver Bezel Ring of Center Hub */}
           <circle
             cx="250"
             cy="250"
-            r="44"
-            fill="url(#rimGold)"
-            stroke="#FFFFFF"
-            strokeWidth="3"
-            filter="url(#pointerShadow)"
+            r="46"
+            fill="url(#silverBezelGrad)"
+            stroke="#475569"
+            strokeWidth="2.5"
+            filter="url(#sliceDropShadow)"
           />
+
+          {/* Middle White/Silver Ring */}
           <circle
             cx="250"
             cy="250"
-            r="32"
-            fill="url(#centerJewel)"
-            stroke="#FEF08A"
+            r="38"
+            fill="#FFFFFF"
+            stroke="#CBD5E1"
+            strokeWidth="1.5"
+          />
+
+          {/* Inner Glossy Blue Spherical Dome */}
+          <circle
+            cx="250"
+            cy="250"
+            r="31"
+            fill="url(#centerBlueSphere)"
+            stroke="#1D4ED8"
             strokeWidth="2"
           />
-          {/* Inner Golden Star in Center Hub */}
+
+          {/* Center 5-Point Golden Star ⭐ */}
           <path
-            d="M 250 234 L 254 245 L 265 246 L 257 253 L 260 264 L 250 258 L 240 264 L 243 253 L 235 246 L 246 245 Z"
-            fill="#FEF08A"
-            opacity="0.9"
+            d="M 250 234 L 253.8 243.5 L 264 244.2 L 256.2 251.2 L 258.5 261.2 L 250 255.8 L 241.5 261.2 L 243.8 251.2 L 236 244.2 L 246.2 243.5 Z"
+            fill="url(#goldStarGrad)"
+            stroke="#FEF08A"
+            strokeWidth="1"
+            filter="url(#goldenBulbGlow)"
+            className="pointer-events-none select-none"
           />
-          <circle cx="244" cy="242" r="3" fill="#FFFFFF" opacity="0.6" />
         </svg>
-      </div>
-
-      {/* Tactile 3D "SPIN" Button */}
-      <div className="mt-4 sm:mt-6 w-full flex flex-col items-center">
-        <button
-          id="btn-main-spin"
-          type="button"
-          disabled={isSpinning || (spinsLeft <= 0 && !config.testRiggedSegmentId)}
-          onClick={startSpin}
-          className={`relative group px-10 py-3.5 sm:px-14 sm:py-4 rounded-full font-black text-lg sm:text-xl tracking-wider uppercase text-white shadow-xl transition-all duration-200 transform ${
-            isSpinning
-              ? 'opacity-80 scale-95 cursor-not-allowed bg-slate-600'
-              : spinsLeft <= 0 && !config.testRiggedSegmentId
-              ? 'opacity-60 cursor-not-allowed bg-slate-500'
-              : 'hover:scale-105 active:scale-95 cursor-pointer hover:shadow-2xl'
-          }`}
-          style={{
-            backgroundColor:
-              isSpinning || (spinsLeft <= 0 && !config.testRiggedSegmentId)
-                ? undefined
-                : theme.buttonColor || '#E62129',
-            boxShadow:
-              !isSpinning && (spinsLeft > 0 || config.testRiggedSegmentId)
-                ? `0 10px 25px -3px ${theme.buttonColor || '#E62129'}80, inset 0 2px 4px rgba(255,255,255,0.4)`
-                : undefined,
-          }}
-        >
-          {/* Top gloss highlight on button */}
-          <span className="absolute top-1 inset-x-4 h-2 bg-white/30 rounded-full blur-[1px] pointer-events-none" />
-
-          <span className="relative flex items-center justify-center gap-2">
-            {isSpinning ? (
-              <>
-                <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>SPINNING...</span>
-              </>
-            ) : spinsLeft <= 0 && !config.testRiggedSegmentId ? (
-              <span>NO SPINS LEFT</span>
-            ) : (
-              <span>SPIN &amp; WIN</span>
-            )}
-          </span>
-        </button>
-
-        {/* Spins helper label */}
-        <p className="mt-2 text-xs font-semibold text-slate-400">
-          {spinsLeft > 0 ? (
-            <span>
-              Tap to spin • <span className="text-indigo-400 font-bold">{spinsLeft}</span> chances remaining
-            </span>
-          ) : (
-            <span className="text-amber-400">Out of spins today. Adjust in settings or reset tokens.</span>
-          )}
-        </p>
       </div>
     </div>
   );

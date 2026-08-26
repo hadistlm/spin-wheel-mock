@@ -1,5 +1,7 @@
 export type Rarity = 'common' | 'rare' | 'epic' | 'legendary' | 'loss';
 
+export type DisplayMode = 'signage' | 'desktop' | 'tablet' | 'mobile';
+
 export interface WheelSegment {
   id: string;
   label: string;
@@ -7,27 +9,30 @@ export interface WheelSegment {
   iconName: 'coffee' | 'gift' | 'percent' | 'ticket' | 'sparkles' | 'award' | 'zap' | 'frown' | 'home' | 'smartphone' | 'shopping-bag' | 'dollar-sign';
   color: string;
   textColor: string;
-  weight: number; // Probability weight (e.g., 20, 10, 1)
+  weight: number; // Bobot probabilitas (contoh: 20, 10, 1)
   rarity: Rarity;
   isLoss: boolean;
   prizeValue?: string;
   voucherCodeTemplate?: string;
   terms?: string;
-  stock?: number; // Optional remaining quantity
+  initialQuota?: number; // Kapasitas/Kuota maksimal (contoh: iPhone 10, Earpods 3)
+  wonCount?: number; // Jumlah yang sudah dimenangkan
+  unlimitedQuota?: boolean; // True jika kuota tanpa batas
 }
 
 export type EasingType = 'cubic-ease-out' | 'suspense-slowdown' | 'elastic-bounce' | 'ultra-fast';
 
 export interface SpinConfig {
-  spinDuration: number; // in seconds (e.g., 4 to 8)
-  minRotations: number; // minimum full turns (e.g., 5 to 10)
+  spinDuration: number; // dalam detik (contoh: 4 sampai 8)
+  minRotations: number; // putaran penuh minimum (contoh: 5 sampai 10)
   easing: EasingType;
   soundEnabled: boolean;
   hapticEnabled: boolean;
   themeId: 'btn-housing-expo' | 'tech-bonanza' | 'gold-jackpot' | 'foodie-delight';
   bulbsEffect: 'chase' | 'blink' | 'rainbow' | 'steady';
-  testRiggedSegmentId: string | null; // For developer/admin testing
+  testRiggedSegmentId: string | null; // Untuk pengujian admin / developer
   dailySpinLimit: number;
+  displayMode?: DisplayMode;
 }
 
 export interface ClaimedReward {
