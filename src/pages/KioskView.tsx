@@ -164,6 +164,7 @@ export const KioskView: React.FC<KioskViewProps> = ({
         segment={winningSegment}
         isOpen={isClaimModalOpen}
         soundEnabled={config.soundEnabled}
+        displayMode={displayMode}
         onClose={() => setIsClaimModalOpen(false)}
         onClaim={onClaimReward}
         onSpinAgain={() => {
