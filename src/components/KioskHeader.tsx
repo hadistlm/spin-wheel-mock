@@ -9,7 +9,11 @@ import logo3 from '../../assets/logo_3.png';
 const BTN_LOGOS = [logo1, logo2, logo3];
 const LOGO_FADE_INTERVAL_MS = 3000;
 
-const BtnLogoFade: React.FC = () => {
+interface BtnLogoFadeProps {
+  size?: 'default' | 'signage';
+}
+
+export const BtnLogoFade: React.FC<BtnLogoFadeProps> = ({ size = 'default' }) => {
   const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
@@ -23,8 +27,13 @@ const BtnLogoFade: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
+  const sizeClass =
+    size === 'signage'
+      ? 'h-[220px] w-[440px] sm:h-[300px] sm:w-[600px] md:h-[360px] md:w-[720px] lg:h-[425px] lg:w-[850px]'
+      : 'h-8 w-20 sm:h-9 sm:w-24';
+
   return (
-    <div className="relative h-8 w-20 sm:h-9 sm:w-24 shrink-0">
+    <div className={`relative shrink-0 ${sizeClass}`}>
       {BTN_LOGOS.map((logo, index) => (
         <img
           key={logo}
@@ -61,22 +70,9 @@ export const KioskHeader: React.FC<KioskHeaderProps> = ({
 
   return (
     <header className="w-full bg-[#0F172A]/95 backdrop-blur-md border-b border-slate-800 px-4 py-3 sm:px-6 shadow-xs flex items-center justify-between z-20">
-      {/* Brand logo & event title */}
+      {/* Brand logo & event title (btn-theme logo moved above wheel in KioskView) */}
       <div className="flex items-center gap-3">
-        {isBtnTheme ? (
-          <div className="flex items-center gap-3">
-            <BtnLogoFade />
-            <div className="h-6 w-px bg-slate-700 hidden xs:block" />
-            <div className="flex flex-col">
-              <span className="text-xs sm:text-sm font-semibold text-slate-200 tracking-tight leading-tight">
-                {theme.headerSubtitle || 'Danantara Housing Property Showcase 2026'}
-              </span>
-              <span className="text-[10px] text-slate-400 font-medium hidden sm:inline-block">
-                Pameran Properti &amp; KPR BTN Expo
-              </span>
-            </div>
-          </div>
-        ) : (
+        {!isBtnTheme && (
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-sm font-black text-sm">
               {theme.headerBrand.slice(0, 2).toUpperCase()}

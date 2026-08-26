@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { WheelSegment, SpinConfig, WheelTheme, ClaimedReward, DisplayMode } from '../types';
-import { KioskHeader } from '../components/KioskHeader';
+import { KioskHeader, BtnLogoFade } from '../components/KioskHeader';
 import { KioskFooter } from '../components/KioskFooter';
 import { SpinningWheel } from '../components/SpinningWheel';
 import { RewardClaimModal } from '../components/RewardClaimModal';
@@ -97,9 +97,28 @@ export const KioskView: React.FC<KioskViewProps> = ({
             </svg>
           </div>
 
+          {/* Brand Logo (btn theme) above event title */}
+          {activeTheme.id === 'btn-housing-expo' && (
+            <div
+              className={`relative z-10 flex justify-center ${
+                displayMode === 'signage' ? 'mb-10 sm:mb-14' : 'mb-3 sm:mb-4'
+              }`}
+            >
+              <BtnLogoFade size={displayMode === 'signage' ? 'signage' : 'default'} />
+            </div>
+          )}
+
           {/* Event Title Header */}
-          <div className="text-center relative z-10 mb-3 sm:mb-4">
-            <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30 text-[11px] font-black uppercase tracking-wider">
+          <div
+            className={`text-center relative z-10 ${
+              displayMode === 'signage' ? 'mb-8 sm:mb-12' : 'mb-3 sm:mb-4'
+            }`}
+          >
+            <div
+              className={`inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30 font-black uppercase tracking-wider ${
+                displayMode === 'signage' ? 'px-6 py-2.5 text-xl sm:text-2xl' : 'px-3.5 py-1 text-[11px]'
+              }`}
+            >
               <span>DANANTARA BTN HOUSING EXPO 2026</span>
             </div>
           </div>
@@ -118,7 +137,11 @@ export const KioskView: React.FC<KioskViewProps> = ({
           </div>
 
           {/* Live Prize Segment Badges underneath */}
-          <div className="mt-20 w-full max-w-md relative z-10 flex flex-wrap items-center justify-center gap-1.5 px-2">
+          <div
+            className={`mt-20 w-full relative z-10 flex flex-wrap items-center justify-center ${
+              displayMode === 'signage' ? 'max-w-4xl gap-4 px-4' : 'max-w-md gap-1.5 px-2'
+            }`}
+          >
             {segments.map((s) => {
               const hasQuota = !s.unlimitedQuota && s.initialQuota !== undefined;
               const remaining = hasQuota ? Math.max(0, s.initialQuota! - (s.wonCount || 0)) : null;
@@ -127,20 +150,24 @@ export const KioskView: React.FC<KioskViewProps> = ({
               return (
                 <span
                   key={s.id}
-                  className={`text-[10px] font-bold px-2.5 py-1 rounded-full border shadow-2xs flex items-center gap-1.5 transition-all ${
+                  className={`font-bold rounded-full border shadow-2xs flex items-center transition-all ${
+                    displayMode === 'signage' ? 'text-lg px-5 py-2.5 gap-3' : 'text-[10px] px-2.5 py-1 gap-1.5'
+                  } ${
                     isOutOfStock
                       ? 'border-slate-800 bg-slate-900/60 text-slate-500 line-through'
                       : 'border-slate-700/80 bg-slate-800/90 text-slate-200'
                   }`}
                 >
                   <span
-                    className="w-2 h-2 rounded-full inline-block"
+                    className={`rounded-full inline-block ${displayMode === 'signage' ? 'w-4 h-4' : 'w-2 h-2'}`}
                     style={{ backgroundColor: isOutOfStock ? '#64748B' : s.color }}
                   />
-                  <span className="truncate max-w-[100px]">{s.label}</span>
+                  <span className={`truncate ${displayMode === 'signage' ? 'max-w-[280px]' : 'max-w-[100px]'}`}>
+                    {s.label}
+                  </span>
                   {hasQuota && (
                     <span
-                      className={`text-[9px] px-1 rounded ${
+                      className={`rounded ${displayMode === 'signage' ? 'text-sm px-2.5 py-0.5' : 'text-[9px] px-1'} ${
                         isOutOfStock
                           ? 'bg-rose-950 text-rose-400 font-normal'
                           : 'bg-slate-700 text-amber-300 font-black'
