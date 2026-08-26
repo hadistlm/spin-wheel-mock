@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { WheelSegment, SpinConfig, EasingType, Rarity } from '../types';
-import { SegmentIcon } from './Icons';
+import { SegmentIcon, AVAILABLE_ICONS } from './Icons';
 import { PRESET_SEGMENTS, PRESET_THEMES } from '../data/presets';
 import {
   Sliders,
@@ -27,21 +27,6 @@ interface ProbabilitySettingsModalProps {
   onResetPreset: (presetId: string) => void;
   onAddSpins: (count: number) => void;
 }
-
-const AVAILABLE_ICONS = [
-  'coffee',
-  'home',
-  'gift',
-  'percent',
-  'award',
-  'sparkles',
-  'zap',
-  'smartphone',
-  'shopping-bag',
-  'dollar-sign',
-  'ticket',
-  'frown',
-] as const;
 
 const RARITY_COLORS: Record<Rarity, string> = {
   common: 'bg-slate-800 text-slate-300 border-slate-700',

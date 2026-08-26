@@ -15,6 +15,21 @@ import {
   LucideProps,
 } from 'lucide-react';
 
+export const AVAILABLE_ICONS = [
+  'coffee',
+  'home',
+  'gift',
+  'percent',
+  'award',
+  'sparkles',
+  'zap',
+  'smartphone',
+  'shopping-bag',
+  'dollar-sign',
+  'ticket',
+  'frown',
+] as const;
+
 interface SegmentIconProps extends LucideProps {
   name: string;
 }

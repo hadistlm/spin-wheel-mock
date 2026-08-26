@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { WheelSegment, SpinConfig, Rarity, DisplayMode, ClaimedReward } from '../types';
 import { PRESET_SEGMENTS, PRESET_THEMES } from '../data/presets';
 import { SegmentIcon } from '../components/Icons';
+import { IconPickerModal } from '../components/IconPickerModal';
 import {
   Sliders,
   Sparkles,
@@ -77,6 +78,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'segments' | 'stats' | 'display' | 'physics'>('segments');
   const [saveToast, setSaveToast] = useState<string | null>(null);
+  const [iconPickerSegmentId, setIconPickerSegmentId] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setSaveToast(msg);
@@ -369,12 +371,15 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                           title="Ganti warna segmen"
                         />
 
-                        <div
-                          className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-sm"
+                        <button
+                          type="button"
+                          onClick={() => setIconPickerSegmentId(seg.id)}
+                          title="Ganti ikon segmen"
+                          className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-sm cursor-pointer ring-1 ring-transparent hover:ring-white/40 transition-all"
                           style={{ backgroundColor: seg.color }}
                         >
                           <SegmentIcon name={seg.iconName} className="w-5 h-5" />
-                        </div>
+                        </button>
 
                         <div>
                           <input
@@ -954,6 +959,17 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           </div>
         )}
       </main>
+
+      <IconPickerModal
+        isOpen={iconPickerSegmentId !== null}
+        currentIcon={segments.find((s) => s.id === iconPickerSegmentId)?.iconName ?? null}
+        onClose={() => setIconPickerSegmentId(null)}
+        onSelect={(icon) => {
+          if (iconPickerSegmentId) {
+            handleUpdateSegmentField(iconPickerSegmentId, 'iconName', icon);
+          }
+        }}
+      />
     </div>
   );
 };
