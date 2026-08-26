@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { WheelSegment, SpinConfig, WheelTheme, ClaimedReward, DisplayMode } from '../types';
-import { KioskHeader, BtnLogoFade } from '../components/KioskHeader';
+import { BtnLogoFade } from '../components/KioskHeader';
 import { KioskFooter } from '../components/KioskFooter';
 import { SpinningWheel } from '../components/SpinningWheel';
 import { RewardClaimModal } from '../components/RewardClaimModal';
@@ -72,17 +72,6 @@ export const KioskView: React.FC<KioskViewProps> = ({
       <main
         className={`w-full relative z-20 transition-all duration-300 flex flex-col justify-between ${getContainerWidthClass()}`}
       >
-        {/* Kiosk Header */}
-        <KioskHeader
-          theme={activeTheme}
-          spinsLeft={10}
-          walletCount={claimedRewards.length}
-          soundEnabled={config.soundEnabled}
-          onToggleSound={onToggleSound}
-          onOpenSettings={() => {}}
-          onOpenWallet={() => {}}
-        />
-
         {/* Center Stage & Wheel Content Area */}
         <div className="relative flex-1 flex flex-col items-center justify-center px-4 py-6 sm:py-8 bg-sleek-grid overflow-hidden">
           {/* Subtle watermark in background */}
