@@ -29,7 +29,7 @@ export const BtnLogoFade: React.FC<BtnLogoFadeProps> = ({ size = 'default' }) =>
 
   const sizeClass =
     size === 'signage'
-      ? 'h-[220px] w-[440px] sm:h-[300px] sm:w-[600px] md:h-[360px] md:w-[720px] lg:h-[425px] lg:w-[850px]'
+      ? 'h-[130px] w-[260px] sm:h-[175px] sm:w-[350px] md:h-[215px] md:w-[430px] lg:h-[255px] lg:w-[510px]'
       : 'h-8 w-20 sm:h-9 sm:w-24';
 
   return (
