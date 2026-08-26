@@ -1,7 +1,43 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { WheelTheme } from '../types';
 import { SlidersHorizontal, Gift, Volume2, VolumeX } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import logo1 from '../../assets/logo_1.png';
+import logo2 from '../../assets/logo_2.png';
+import logo3 from '../../assets/logo_3.png';
+
+const BTN_LOGOS = [logo1, logo2, logo3];
+const LOGO_FADE_INTERVAL_MS = 3000;
+
+const BtnLogoFade: React.FC = () => {
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
+
+    const timer = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % BTN_LOGOS.length);
+    }, LOGO_FADE_INTERVAL_MS);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="relative h-8 w-20 sm:h-9 sm:w-24 shrink-0">
+      {BTN_LOGOS.map((logo, index) => (
+        <img
+          key={logo}
+          src={logo}
+          alt="BTN"
+          className={`absolute inset-0 h-full w-full object-contain object-left transition-opacity duration-700 ease-out ${
+            index === activeIndex ? 'opacity-100' : 'opacity-0'
+          }`}
+        />
+      ))}
+    </div>
+  );
+};
 
 interface KioskHeaderProps {
   theme: WheelTheme;
@@ -29,11 +65,7 @@ export const KioskHeader: React.FC<KioskHeaderProps> = ({
       <div className="flex items-center gap-3">
         {isBtnTheme ? (
           <div className="flex items-center gap-3">
-            <div className="flex items-baseline">
-              <span className="text-3xl font-black italic tracking-tighter text-[#3B82F6] leading-none">
-                b<span className="text-[#EF4444]">t</span>n
-              </span>
-            </div>
+            <BtnLogoFade />
             <div className="h-6 w-px bg-slate-700 hidden xs:block" />
             <div className="flex flex-col">
               <span className="text-xs sm:text-sm font-semibold text-slate-200 tracking-tight leading-tight">
