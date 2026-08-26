@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { WheelSegment, SpinConfig, WheelTheme } from '../types';
+import { WheelSegment, SpinConfig, WheelTheme, DisplayMode } from '../types';
 import { SegmentIcon } from './Icons';
 import { playTickSound, playButtonPressSound } from '../utils/audio';
 
@@ -8,6 +8,7 @@ interface SpinningWheelProps {
   config: SpinConfig;
   theme: WheelTheme;
   isSpinning: boolean;
+  displayMode?: DisplayMode;
   onSpinStart: () => void;
   onSpinEnd: (winningSegment: WheelSegment) => void;
 }
@@ -17,6 +18,7 @@ export const SpinningWheel: React.FC<SpinningWheelProps> = ({
   config,
   theme,
   isSpinning,
+  displayMode,
   onSpinStart,
   onSpinEnd,
 }) => {
@@ -194,8 +196,14 @@ export const SpinningWheel: React.FC<SpinningWheelProps> = ({
     };
   }, []);
 
+  const isSignage = displayMode === 'signage';
+
   return (
-    <div className="flex flex-col items-center justify-center relative w-full max-w-[560px] mx-auto select-none">
+    <div
+      className={`flex flex-col items-center justify-center relative w-full mx-auto select-none ${
+        isSignage ? 'max-w-[900px]' : 'max-w-[560px]'
+      }`}
+    >
       {/* Ambient background glow */}
       <div
         className={`absolute -inset-6 rounded-full blur-3xl opacity-30 pointer-events-none transition-all duration-700 ${
@@ -210,9 +218,11 @@ export const SpinningWheel: React.FC<SpinningWheelProps> = ({
         id="interactive-wheel-stage"
         onClick={startSpin}
         title={isSpinning ? 'Sedang Memutar...' : 'Klik Roda Untuk Memutar!'}
-        className={`relative w-[340px] h-[340px] xs:w-[390px] xs:h-[390px] sm:w-[460px] sm:h-[460px] md:w-[510px] md:h-[510px] flex items-center justify-center cursor-pointer transition-transform duration-300 ${
-          isSpinning ? 'cursor-not-allowed scale-[0.995]' : 'hover:scale-[1.015] active:scale-[0.985]'
-        }`}
+        className={`relative flex items-center justify-center cursor-pointer transition-transform duration-300 ${
+          isSignage
+            ? 'w-[440px] h-[440px] sm:w-[600px] sm:h-[600px] md:w-[720px] md:h-[720px] lg:w-[850px] lg:h-[850px]'
+            : 'w-[340px] h-[340px] xs:w-[390px] xs:h-[390px] sm:w-[460px] sm:h-[460px] md:w-[510px] md:h-[510px]'
+        } ${isSpinning ? 'cursor-not-allowed scale-[0.995]' : 'hover:scale-[1.015] active:scale-[0.985]'}`}
       >
         {/* Top Pointer Needle (Fixed at top 12 o'clock, styled like Screenshot_1.png) */}
         <div
@@ -618,15 +628,31 @@ export const SpinningWheel: React.FC<SpinningWheelProps> = ({
             strokeWidth="2"
           />
 
-          {/* Center 5-Point Golden Star ⭐ */}
-          <path
-            d="M 250 234 L 253.8 243.5 L 264 244.2 L 256.2 251.2 L 258.5 261.2 L 250 255.8 L 241.5 261.2 L 243.8 251.2 L 236 244.2 L 246.2 243.5 Z"
-            fill="url(#goldStarGrad)"
-            stroke="#FEF08A"
-            strokeWidth="1"
-            filter="url(#goldenBulbGlow)"
+          {/* Center "SPIN WHEEL" Label */}
+          <text
+            x="250"
+            y="245"
+            textAnchor="middle"
             className="pointer-events-none select-none"
-          />
+            fontSize="9.5"
+            fontWeight="900"
+            fill="#FFFFFF"
+            fontFamily="sans-serif"
+          >
+            SPIN
+          </text>
+          <text
+            x="250"
+            y="258"
+            textAnchor="middle"
+            className="pointer-events-none select-none"
+            fontSize="9.5"
+            fontWeight="900"
+            fill="#FFFFFF"
+            fontFamily="sans-serif"
+          >
+            WHEEL
+          </text>
         </svg>
       </div>
     </div>

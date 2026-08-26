@@ -111,13 +111,14 @@ export const KioskView: React.FC<KioskViewProps> = ({
               config={config}
               theme={activeTheme}
               isSpinning={isSpinning}
+              displayMode={displayMode}
               onSpinStart={handleStart}
               onSpinEnd={handleEnd}
             />
           </div>
 
           {/* Live Prize Segment Badges underneath */}
-          <div className="mt-6 w-full max-w-md relative z-10 flex flex-wrap items-center justify-center gap-1.5 px-2">
+          <div className="mt-20 w-full max-w-md relative z-10 flex flex-wrap items-center justify-center gap-1.5 px-2">
             {segments.map((s) => {
               const hasQuota = !s.unlimitedQuota && s.initialQuota !== undefined;
               const remaining = hasQuota ? Math.max(0, s.initialQuota! - (s.wonCount || 0)) : null;
