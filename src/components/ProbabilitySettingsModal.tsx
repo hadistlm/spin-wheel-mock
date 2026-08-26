@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { WheelSegment, SpinConfig, EasingType, Rarity } from '../types';
 import { SegmentIcon, AVAILABLE_ICONS } from './Icons';
-import { PRESET_SEGMENTS, PRESET_THEMES } from '../data/presets';
+import { PRESET_SEGMENTS, PRESET_THEMES } from '../core/presets';
 import {
   Sliders,
   Plus,

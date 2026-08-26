@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { WheelSegment, SpinConfig, Rarity, DisplayMode, ClaimedReward } from '../types';
-import { PRESET_SEGMENTS, PRESET_THEMES } from '../data/presets';
+import { PRESET_SEGMENTS, PRESET_THEMES } from '../core/presets';
 import { SegmentIcon } from '../components/Icons';
 import { IconPickerModal } from '../components/IconPickerModal';
 import {

@@ -1,6 +1,7 @@
 import React, { StrictMode, ReactNode, ErrorInfo } from 'react';
 import { createRoot } from 'react-dom/client';
-import App from './App.tsx';
+import './core/bootstrap';
+import App from './core/App.tsx';
 import './index.css';
 
 interface ErrorBoundaryProps {

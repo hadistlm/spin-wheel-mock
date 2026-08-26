@@ -5,21 +5,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { WheelSegment, SpinConfig, ClaimedReward, WheelTheme, DisplayMode } from './types';
-import { PRESET_SEGMENTS, PRESET_THEMES } from './data/presets';
-import { KioskView } from './pages/KioskView';
-import { AdminPage } from './pages/AdminPage';
-import { HistoryPage } from './pages/HistoryPage';
-import { getHashQueryParam } from './utils/common';
-
-const LOCAL_STORAGE_KEY_REWARDS = 'spin_and_win_claimed_rewards_v3';
-const LOCAL_STORAGE_KEY_SEGMENTS = 'spin_and_win_segments_v3';
-const LOCAL_STORAGE_KEY_CONFIG = 'spin_and_win_config_v3';
-const LOCAL_STORAGE_KEY_DISPLAY_MODE = 'spin_and_win_display_mode_v3';
-const LOCAL_STORAGE_KEY_TOTAL_SPINS = 'spin_and_win_total_spins_v3';
-
-const requestedThemeId = getHashQueryParam('theme');
-const urlThemeId = requestedThemeId && PRESET_THEMES[requestedThemeId] ? requestedThemeId : null;
+import { WheelSegment, SpinConfig, ClaimedReward, WheelTheme, DisplayMode } from '../types';
+import { PRESET_SEGMENTS, PRESET_THEMES } from './presets';
+import { KioskView } from '../pages/KioskView';
+import { AdminPage } from '../pages/AdminPage';
+import { HistoryPage } from '../pages/HistoryPage';
+import { LOCAL_STORAGE_KEYS, urlThemeId } from './bootstrap';
 
 export default function App() {
   // Theme state (URL ?theme= param wins over the default)
@@ -35,8 +26,9 @@ export default function App() {
 
   // Display mode (Default: 'signage' for digital signage)
   const [displayMode, setDisplayMode] = useState<DisplayMode>(() => {
+    if (urlThemeId) return 'signage';
     try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY_DISPLAY_MODE);
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.displayMode);
       if (saved === 'signage' || saved === 'desktop' || saved === 'tablet' || saved === 'mobile') {
         return saved;
       }
@@ -52,7 +44,7 @@ export default function App() {
       return PRESET_SEGMENTS[urlThemeId] || [];
     }
     try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY_SEGMENTS);
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.segments);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length >= 2) {
@@ -82,7 +74,7 @@ export default function App() {
       return defaultConfig;
     }
     try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY_CONFIG);
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.config);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object') {
@@ -97,8 +89,9 @@ export default function App() {
 
   // Won Rewards state
   const [claimedRewards, setClaimedRewards] = useState<ClaimedReward[]>(() => {
+    if (urlThemeId) return [];
     try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY_REWARDS);
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.rewards);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
@@ -111,8 +104,9 @@ export default function App() {
 
   // Total Spins Count
   const [totalSpinsCount, setTotalSpinsCount] = useState<number>(() => {
+    if (urlThemeId) return 0;
     try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY_TOTAL_SPINS);
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.totalSpins);
       if (saved) {
         const parsed = parseInt(saved);
         if (!isNaN(parsed)) return parsed;
@@ -126,7 +120,7 @@ export default function App() {
   // Save to LocalStorage
   useEffect(() => {
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY_SEGMENTS, JSON.stringify(segments));
+      localStorage.setItem(LOCAL_STORAGE_KEYS.segments, JSON.stringify(segments));
     } catch {
       // ignore
     }
@@ -134,7 +128,7 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY_CONFIG, JSON.stringify(config));
+      localStorage.setItem(LOCAL_STORAGE_KEYS.config, JSON.stringify(config));
     } catch {
       // ignore
     }
@@ -142,7 +136,7 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY_REWARDS, JSON.stringify(claimedRewards));
+      localStorage.setItem(LOCAL_STORAGE_KEYS.rewards, JSON.stringify(claimedRewards));
     } catch {
       // ignore
     }
@@ -150,7 +144,7 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY_DISPLAY_MODE, displayMode);
+      localStorage.setItem(LOCAL_STORAGE_KEYS.displayMode, displayMode);
     } catch {
       // ignore
     }
@@ -158,7 +152,7 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY_TOTAL_SPINS, totalSpinsCount.toString());
+      localStorage.setItem(LOCAL_STORAGE_KEYS.totalSpins, totalSpinsCount.toString());
     } catch {
       // ignore
     }
