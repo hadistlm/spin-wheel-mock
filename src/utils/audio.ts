@@ -16,27 +16,39 @@ function getAudioContext(): AudioContext | null {
   return audioCtx;
 }
 
+let tickIsDing = true;
+
 export function playTickSound(frequency: number = 600, volume: number = 0.15) {
   const ctx = getAudioContext();
   if (!ctx) return;
 
   try {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+    const now = ctx.currentTime;
 
-    // Sharp metallic mechanical click
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(frequency, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(frequency * 0.4, ctx.currentTime + 0.04);
+    // Ding-dong doorbell chime: alternates a high "ding" and lower "dong" note,
+    // each a bell-like sine tone (fundamental + soft overtone) with slow decay.
+    const isDing = tickIsDing;
+    tickIsDing = !tickIsDing;
+    const baseFreq = isDing ? frequency : frequency * 0.75;
 
-    gain.gain.setValueAtTime(volume, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
+    [1, 2].forEach((partial, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
 
-    osc.connect(gain);
-    gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(baseFreq * partial, now);
 
-    osc.start();
-    osc.stop(ctx.currentTime + 0.045);
+      const partialVolume = volume * (i === 0 ? 1 : 0.25);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(partialVolume, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.24);
+    });
   } catch {
     // Ignore audio failures if browser blocks autoplay
   }
