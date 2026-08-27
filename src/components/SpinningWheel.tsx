@@ -3,6 +3,35 @@ import { WheelSegment, SpinConfig, WheelTheme, DisplayMode } from '../types';
 import { SegmentIcon } from './Icons';
 import { playTickSound, playButtonPressSound } from '../utils/audio';
 
+function wrapLabel(text: string, maxLineLen: number, maxLines: number): string[] {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let current = '';
+  let wordIndex = 0;
+
+  while (wordIndex < words.length && lines.length < maxLines) {
+    const word = words[wordIndex];
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length <= maxLineLen || !current) {
+      current = candidate;
+      wordIndex++;
+    } else {
+      lines.push(current);
+      current = '';
+    }
+  }
+  if (current) lines.push(current);
+
+  const overflowed = wordIndex < words.length;
+  if (overflowed) {
+    const lastIndex = lines.length - 1;
+    const last = lines[lastIndex];
+    lines[lastIndex] = last.length >= maxLineLen ? last.slice(0, maxLineLen - 1) + '…' : last + '…';
+  }
+
+  return lines;
+}
+
 interface SpinningWheelProps {
   segments: WheelSegment[];
   config: SpinConfig;
@@ -522,41 +551,73 @@ export const SpinningWheel: React.FC<SpinningWheelProps> = ({
                       </g>
 
                       {/* Label Text */}
-                      <text
-                        x="0"
-                        y="40"
-                        fill={isOutOfStock ? '#94A3B8' : segment.textColor || '#FFFFFF'}
-                        textAnchor="middle"
-                        className="font-black tracking-tight"
-                        style={{
-                          fontSize: numSegments > 8 ? '11px' : numSegments > 6 ? '12.5px' : '14.5px',
-                          textShadow: '0 2px 4px rgba(0,0,0,0.7)',
-                          fontWeight: 900,
-                        }}
-                      >
-                        {isOutOfStock
-                          ? 'HABIS'
-                          : segment.label.length > 19
-                          ? segment.label.slice(0, 18) + '…'
-                          : segment.label}
-                      </text>
+                      {(() => {
+                        const labelFontSize =
+                          numSegments >= 8 ? 9.5 : numSegments > 6 ? 12.5 : 14.5;
+                        const maxLineLen = numSegments >= 8 ? 12 : numSegments > 6 ? 15 : 19;
+                        const labelLines = isOutOfStock
+                          ? ['HABIS']
+                          : wrapLabel(segment.label, maxLineLen, 2);
+                        const lineHeight = labelFontSize + 2;
+                        const labelStartY = 40 - ((labelLines.length - 1) * lineHeight) / 2;
 
-                      {/* Subtext or Value */}
-                      {!isOutOfStock && (segment.prizeValue || segment.subtext) && (
-                        <text
-                          x="0"
-                          y="55"
-                          fill="#FEF08A"
-                          textAnchor="middle"
-                          className="font-bold text-[9.5px] tracking-tight"
-                          style={{
-                            textShadow: '0 1px 3px rgba(0,0,0,0.85)',
-                            fontWeight: 700,
-                          }}
-                        >
-                          {segment.prizeValue || segment.subtext}
-                        </text>
-                      )}
+                        return (
+                          <>
+                            <text
+                              x="0"
+                              fill={isOutOfStock ? '#94A3B8' : segment.textColor || '#FFFFFF'}
+                              textAnchor="middle"
+                              className="font-black tracking-tight"
+                              style={{
+                                fontSize: `${labelFontSize}px`,
+                                textShadow: '0 2px 4px rgba(0,0,0,0.7)',
+                                fontWeight: 900,
+                              }}
+                            >
+                              {labelLines.map((line, i) => (
+                                <tspan key={i} x="0" y={labelStartY + i * lineHeight}>
+                                  {line}
+                                </tspan>
+                              ))}
+                            </text>
+
+                            {/* Subtext or Value */}
+                            {!isOutOfStock &&
+                              (segment.prizeValue || segment.subtext) &&
+                              (() => {
+                                const subtextFontSize = numSegments >= 8 ? 8 : 9.5;
+                                const subMaxLineLen = numSegments >= 8 ? 16 : 22;
+                                const subLineHeight = subtextFontSize + 1.5;
+                                const subLines = wrapLabel(
+                                  segment.prizeValue || segment.subtext || '',
+                                  subMaxLineLen,
+                                  2
+                                );
+                                const subStartY = labelStartY + labelLines.length * lineHeight;
+
+                                return (
+                                  <text
+                                    x="0"
+                                    fill="#FEF08A"
+                                    textAnchor="middle"
+                                    className="font-bold tracking-tight"
+                                    style={{
+                                      fontSize: `${subtextFontSize}px`,
+                                      textShadow: '0 1px 3px rgba(0,0,0,0.85)',
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    {subLines.map((line, i) => (
+                                      <tspan key={i} x="0" y={subStartY + i * subLineHeight}>
+                                        {line}
+                                      </tspan>
+                                    ))}
+                                  </text>
+                                );
+                              })()}
+                          </>
+                        );
+                      })()}
 
                       {isOutOfStock && (
                         <text

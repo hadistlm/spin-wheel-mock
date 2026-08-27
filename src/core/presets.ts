@@ -180,8 +180,8 @@ export const PRESET_SEGMENTS: Record<string, WheelSegment[]> = {
   'btn-housing-expo-1': [
     {
       id: 'btn1-1',
-      label: 'Voucher MAP',
-      subtext: 'Rp 50.000',
+      label: 'Voucher MAP 50k',
+      subtext: 'Belanja Hemat Rp 50.000',
       iconName: 'ticket',
       color: '#1D4ED8',
       textColor: '#FFFFFF',
@@ -196,8 +196,8 @@ export const PRESET_SEGMENTS: Record<string, WheelSegment[]> = {
     },
     {
       id: 'btn1-2',
-      label: 'Voucher MAP',
-      subtext: 'Rp 100.000',
+      label: 'Voucher MAP 100k',
+      subtext: 'Diskon Gede Rp 100.000',
       iconName: 'ticket',
       color: '#D92D20',
       textColor: '#FFFFFF',
@@ -291,8 +291,8 @@ export const PRESET_SEGMENTS: Record<string, WheelSegment[]> = {
     },
     {
       id: 'btn1-8',
-      label: 'Voucher MAP',
-      subtext: 'Rp 150.000',
+      label: 'Voucher MAP 150k',
+      subtext: 'Jackpot Voucher Rp 150.000',
       iconName: 'ticket',
       color: '#D92D20',
       textColor: '#FFFFFF',
