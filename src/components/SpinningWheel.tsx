@@ -2,35 +2,7 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { WheelSegment, SpinConfig, WheelTheme, DisplayMode } from '../types';
 import { SegmentIcon } from './Icons';
 import { playTickSound, playButtonPressSound } from '../utils/audio';
-
-function wrapLabel(text: string, maxLineLen: number, maxLines: number): string[] {
-  const words = text.split(' ');
-  const lines: string[] = [];
-  let current = '';
-  let wordIndex = 0;
-
-  while (wordIndex < words.length && lines.length < maxLines) {
-    const word = words[wordIndex];
-    const candidate = current ? `${current} ${word}` : word;
-    if (candidate.length <= maxLineLen || !current) {
-      current = candidate;
-      wordIndex++;
-    } else {
-      lines.push(current);
-      current = '';
-    }
-  }
-  if (current) lines.push(current);
-
-  const overflowed = wordIndex < words.length;
-  if (overflowed) {
-    const lastIndex = lines.length - 1;
-    const last = lines[lastIndex];
-    lines[lastIndex] = last.length >= maxLineLen ? last.slice(0, maxLineLen - 1) + '…' : last + '…';
-  }
-
-  return lines;
-}
+import { wrapLabel } from '../utils/common';
 
 interface SpinningWheelProps {
   segments: WheelSegment[];
