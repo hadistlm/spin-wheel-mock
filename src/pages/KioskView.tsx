@@ -87,7 +87,7 @@ export const KioskView: React.FC<KioskViewProps> = ({
           </div>
 
           {/* Brand Logo (btn theme) above event title */}
-          {activeTheme.id === 'btn-housing-expo' && (
+          {['btn-housing-expo', 'btn-housing-expo-1'].includes(activeTheme.id) && (
             <div
               className={`relative z-10 flex justify-center ${
                 displayMode === 'signage' ? 'mb-10 sm:mb-14' : 'mb-3 sm:mb-4'
