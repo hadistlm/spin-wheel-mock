@@ -249,7 +249,7 @@ export const PRESET_SEGMENTS: Record<string, WheelSegment[]> = {
       iconName: 'frown',
       color: '#334155',
       textColor: '#FFFFFF',
-      weight: 60,
+      weight: 45,
       rarity: 'loss',
       isLoss: true,
       terms: 'Belum beruntung di putaran ini. Kunjungi booth properti untuk putaran ekstra.',

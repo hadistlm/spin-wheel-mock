@@ -60,7 +60,7 @@ export default function App() {
   // Spin Configuration
   const [config, setConfig] = useState<SpinConfig>(() => {
     const defaultConfig: SpinConfig = {
-      spinDuration: 5.5,
+      spinDuration: 8,
       minRotations: 6,
       easing: 'suspense-slowdown',
       soundEnabled: true,
