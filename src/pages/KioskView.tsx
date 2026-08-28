@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { History } from 'lucide-react';
 import { WheelSegment, SpinConfig, WheelTheme, ClaimedReward, DisplayMode } from '../types';
 import { BtnLogoFade } from '../components/KioskHeader';
 import { KioskFooter } from '../components/KioskFooter';
@@ -28,6 +30,7 @@ export const KioskView: React.FC<KioskViewProps> = ({
   onClaimReward,
   onToggleSound,
 }) => {
+  const navigate = useNavigate();
   const [isSpinning, setIsSpinning] = useState<boolean>(false);
   const [winningSegment, setWinningSegment] = useState<WheelSegment | null>(null);
   const [isClaimModalOpen, setIsClaimModalOpen] = useState<boolean>(false);
@@ -174,6 +177,21 @@ export const KioskView: React.FC<KioskViewProps> = ({
         {/* Kiosk Footer with Danantara & Indonesia 81 Branding */}
         <KioskFooter theme={activeTheme} />
       </main>
+
+      {/* Floating History Button — hidden by default, revealed on hover; pulses in signage mode for touch discoverability */}
+      <button
+        type="button"
+        aria-label="View reward history"
+        onClick={() => navigate('/history')}
+        className={`group fixed top-6 right-6 z-50 w-12 h-12 rounded-full flex items-center justify-center border border-slate-700/80 bg-slate-800/90 backdrop-blur-sm shadow-2xl transition-opacity duration-300 hover:opacity-100 hover:border-amber-500/50 ${
+          displayMode === 'signage' ? 'opacity-15 animate-pulse' : 'opacity-0'
+        }`}
+      >
+        {displayMode === 'signage' && (
+          <span className="absolute inset-0 rounded-full ring-2 ring-amber-400/40 animate-ping" />
+        )}
+        <History className="w-5 h-5 text-amber-300 relative z-10" />
+      </button>
 
       {/* Simplified Reward Modal */}
       <RewardClaimModal
